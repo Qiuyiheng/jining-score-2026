@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>济宁城区高中 · 数据驾驶舱</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f4f5f9;--bg2:#eaecf2;--bg3:#e2e4eb;--card:#ffffff;
+  --border:#e2e4eb;--border2:#eef0f4;
+  --text:#1a1d2e;--text2:#5b5f72;--text3:#9296a6;
+  --accent:#4361ee;--accent2:#8b5cf6;--accent-glow:rgba(67,97,238,.18);
+  --up:#e04050;--up-bg:rgba(224,64,80,.08);--down:#10b981;--down-bg:rgba(16,185,129,.08);
+  --gold:#e8930c;--gold-bg:rgba(232,147,12,.08);
+  --radius:12px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Noto Sans SC','Inter','PingFang SC',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.page{position:relative;z-index:1;max-width:1320px;margin:0 auto;padding:16px 20px 40px}
+
+/* topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 0 14px;border-bottom:1px solid var(--border2);margin-bottom:18px}
+.topbar .left{display:flex;align-items:center;gap:10px}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.topbar h1{font-size:15px;font-weight:800}
+.topbar h1 em{font-style:normal;color:var(--accent)}
+.topbar .right{display:flex;align-items:center;gap:14px;font-size:11px;color:var(--text3)}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 2s infinite;display:inline-block}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* nav */
+.nav{display:flex;gap:3px;margin-bottom:16px;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.04);border:1px solid var(--border);border-radius:8px;padding:3px;width:fit-content}
+.nav-btn{font-family:inherit;font-size:14px;font-weight:600;padding:6px 16px;border-radius:6px;border:none;background:transparent;color:var(--text3);cursor:pointer;transition:.2s;white-space:nowrap}
+.nav-btn:hover{color:var(--text2)}
+.nav-btn.on{background:var(--accent);color:#fff;box-shadow:0 2px 10px var(--accent-glow)}
+
+.panel{display:none;animation:fadeUp .3s ease}
+.panel.show{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.row{display:flex;gap:12px;margin-bottom:12px}
+.row>*{flex:1}
+.row .w2{flex:2} .row .w3{flex:3}
+.mb{margin-bottom:12px}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:.25s}
+.card{box-shadow:0 1px 3px rgba(0,0,0,.04)}.card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.card-h{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border2)}
+.card-h .ic{font-size:13px}
+.card-h h3{font-size:14px;font-weight:700;flex:1}
+.card-h .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(78,124,255,.1);color:var(--accent)}
+.card-b{padding:14px}
+
+/* kpi */
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;position:relative;overflow:hidden;transition:.25s}
+.kpi{box-shadow:0 1px 3px rgba(0,0,0,.04)}.kpi:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.08)}
+.kpi .lb{font-size:12px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.kpi .vl{font-family:'Inter',sans-serif;font-size:34px;font-weight:800;line-height:1.1}
+.kpi .dt{font-family:'Inter',sans-serif;font-size:13px;font-weight:700;margin-top:3px;display:inline-flex;padding:2px 7px;border-radius:5px}
+.kpi .dt.up{background:var(--up-bg);color:var(--up)} .kpi .dt.down{background:var(--down-bg);color:var(--down)}
+.kpi .glow{position:absolute;top:-30px;right:-30px;width:80px;height:80px;border-radius:50%;filter:blur(40px);opacity:.25;pointer-events:none}
+
+/* table */
+table{width:100%;border-collapse:collapse}
+thead th{padding:9px 10px;font-size:12px;font-weight:600;color:var(--text3);text-align:center;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;transition:.2s;text-transform:uppercase;letter-spacing:.3px}
+thead th:hover{color:var(--accent)}
+thead th:first-child{text-align:left;padding-left:14px}
+tbody td{padding:10px 10px;text-align:center;border-bottom:1px solid var(--border2);font-size:14px;font-family:'Noto Sans SC','Inter','PingFang SC',sans-serif}
+tbody td:first-child{text-align:left;padding-left:14px;font-family:'Noto Sans SC',sans-serif;font-weight:500;font-size:13px}
+tbody tr{transition:.15s} tbody tr:hover{background:rgba(67,97,238,.03)}
+tbody tr:last-child td{border-bottom:none}
+.badge{display:inline-flex;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px}
+.badge.up{background:var(--up-bg);color:var(--up)} .badge.down{background:var(--down-bg);color:var(--down)} .badge.flat{background:#eaecf2;color:var(--text3)}
+.tier{font-size:9px;font-weight:800;padding:1px 5px;border-radius:3px;letter-spacing:.3px}
+.tier-a{background:var(--gold-bg);color:var(--gold)} .tier-b{background:rgba(67,97,238,.08);color:var(--accent)} .tier-c{background:#eaecf2;color:var(--text3)}
+.sch-cell{display:flex;align-items:center;gap:6px}
+.spark{display:flex;align-items:flex-end;gap:2px;height:18px;justify-content:center}
+.spark-bar{width:4px;border-radius:1.5px;transition:height .5s cubic-bezier(.34,1.56,.64,1)}
+
+.ch{width:100%;height:320px} .ch-sm{width:100%;height:240px} .ch-lg{width:100%;height:400px}
+
+/* ── MAP ── */
+#mapWrap{position:relative}
+#realMap{width:100%;height:480px;border-radius:0 0 var(--radius) var(--radius)}
+.leaflet-container{background:#e8ecf2}
+
+/* custom markers */
+.school-marker{
+  display:flex;align-items:center;justify-content:center;
+  border-radius:50%;border:2.5px solid #fff;
+  font-family:'Inter',sans-serif;font-weight:800;font-size:10px;color:#fff;
+  box-shadow:0 2px 6px rgba(0,0,0,.2);
+  transition:transform .2s;
+  cursor:pointer;
+}
+.school-marker:hover{transform:scale(1.25);z-index:1000!important}
+.school-marker.tier-a{background:var(--gold);border-color:#fde68a}
+.school-marker.tier-b{background:var(--accent);border-color:#93b4ff}
+.school-marker.tier-c{background:#9296a6;border-color:#c8cad2}
+
+/* leaflet popup override */
+.leaflet-popup-content-wrapper{
+  background:var(--card)!important;color:var(--text)!important;
+  border:1px solid var(--border)!important;border-radius:10px!important;
+  box-shadow:0 4px 20px rgba(0,0,0,.12)!important;
+  font-family:'Noto Sans SC','Inter',sans-serif!important;
+}
+.leaflet-popup-tip{background:var(--card)!important;border:1px solid var(--border)!important}
+.leaflet-popup-content{margin:12px 16px!important;font-size:12px!important;line-height:1.7!important}
+.leaflet-popup-content .pop-name{font-size:14px;font-weight:700;margin-bottom:4px}
+.leaflet-popup-content .pop-addr{color:var(--text3);font-size:11px;margin-bottom:6px}
+.leaflet-popup-content .pop-score{font-family:'Inter',sans-serif;font-size:20px;font-weight:800}
+.leaflet-popup-content .pop-detail{font-size:11px;color:var(--text2);margin-top:4px}
+.leaflet-popup-close-button{color:var(--text3)!important;font-size:18px!important}
+
+/* map overlay legend */
+.map-overlay{
+  position:absolute;top:14px;right:14px;z-index:1000;
+  background:rgba(255,255,255,.95);border:1px solid var(--border);
+  border-radius:8px;padding:10px 14px;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.08);
+  font-size:11px;color:var(--text2);line-height:1.8;
+}
+.map-overlay .ov-title{font-weight:700;color:var(--text);font-size:12px;margin-bottom:4px}
+.map-overlay .ov-item{display:flex;align-items:center;gap:6px}
+.map-overlay .ov-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;border:1.5px solid rgba(0,0,0,.08)}
+
+/* race */
+.race-area{position:relative;overflow:visible;min-height:400px}
+.race-row{position:absolute;left:110px;right:50px;height:32px;display:flex;align-items:center;top:-50px;opacity:0}
+.race-row.go{transition:top .8s cubic-bezier(.22,1,.36,1),opacity .5s}
+.race-bar-inner{height:26px;border-radius:4px;width:0}
+.race-bar-inner.go{transition:width .8s cubic-bezier(.22,1,.36,1)}
+.race-name-lbl{position:absolute;right:calc(100% + 10px);width:100px;text-align:right;font-size:13px;font-weight:600;color:#1a1d2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.race-val{margin-left:8px;font-family:'Inter',sans-serif;font-size:15px;font-weight:700;color:#1a1d2e;min-width:28px}
+.race-big{position:absolute;top:50%;right:20px;transform:translateY(-50%);font-family:'Inter',sans-serif;font-size:80px;font-weight:900;color:rgba(67,97,238,.06);pointer-events:none}
+.race-ctrl{display:flex;align-items:center;gap:10px;margin-top:10px;justify-content:center}
+.race-btn{font-family:inherit;font-size:12px;font-weight:600;padding:6px 18px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text2);cursor:pointer;transition:.2s}
+.race-btn:hover{border-color:var(--accent);color:var(--accent)}
+.race-btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.race-yr{font-family:'Inter',sans-serif;font-size:26px;font-weight:800;color:var(--accent);min-width:50px;text-align:center}
+.race-track{flex:1;height:3px;background:var(--bg2);border-radius:2px;cursor:pointer;position:relative}
+.race-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+
+/* radar */
+.radar-picks{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.radar-pick{font-family:inherit;font-size:10px;font-weight:600;padding:3px 10px;border-radius:5px;border:1.5px solid var(--border);background:var(--card);color:var(--text3);cursor:pointer;transition:.2s}
+.radar-pick.on{border-color:var(--accent);color:var(--accent);background:rgba(67,97,238,.06)}
+
+/* insight */
+.insight-box{background:linear-gradient(135deg,rgba(67,97,238,.04),rgba(124,92,252,.03));border:1px solid rgba(67,97,238,.12);border-radius:var(--radius);padding:16px 18px;position:relative;overflow:hidden}
+.insight-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.insight-box .itag{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;margin-bottom:8px}
+.insight-box p{font-size:14px;color:var(--text2);line-height:1.8;margin-bottom:6px}
+.insight-box p:last-child{margin:0}
+.insight-box strong{color:var(--text)}
+.insight-box em{font-style:normal;color:var(--accent)}
+
+.exp-bar{display:flex;gap:6px;justify-content:flex-end;margin-bottom:10px}
+.exp-btn{font-family:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text3);cursor:pointer;transition:.2s;display:flex;align-items:center;gap:4px}
+.exp-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+.tip{position:fixed;background:var(--card);color:var(--text);font-size:11px;padding:5px 11px;border-radius:6px;pointer-events:none;z-index:200;opacity:0;transition:opacity .12s;white-space:nowrap;border:1px solid var(--border);box-shadow:0 4px 14px rgba(0,0,0,.1)}
+.tip.show{opacity:1}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.1);border-radius:3px}
+
+@media(max-width:900px){
+  .row{flex-direction:column}.row .w2,.row .w3{flex:auto}
+  .nav{flex-wrap:wrap;width:100%}.kpi .vl{font-size:20px}
+}
+</style>
+</head>
+<body>
+<div class="page" id="dash">
+
+<div class="topbar">
+  <div class="left"><div class="logo-icon">📊</div><h1>济宁城区高中 <em>录取数据中心</em></h1></div>
+  <div class="right"><span><span class="live-dot"></span> 数据更新</span><span>济宁市教育局</span><span id="clock"></span></div>
+</div>
+
+<div class="nav" id="nav">
+  <button class="nav-btn on" data-p="overview">总览</button>
+  <button class="nav-btn" data-p="map">学校地图</button>
+  <button class="nav-btn" data-p="race">排名动态</button>
+  <button class="nav-btn" data-p="trend">趋势分析</button>
+  <button class="nav-btn" data-p="radar">雷达对比</button>
+  <button class="nav-btn" data-p="insight">数据解读</button>
+</div>
+
+<div class="exp-bar">
+  <button class="exp-btn" onclick="expPNG()">📷 导出 PNG</button>
+  <button class="exp-btn" onclick="expPDF()">📄 导出 PDF</button>
+</div>
+
+<!-- ═══════ 总览 ═══════ -->
+<div class="panel show" id="p-overview">
+  <div class="row mb">
+    <div class="kpi"><div class="glow" style="background:var(--accent)"></div><div class="lb">2026 资格线</div><div class="vl" style="color:var(--accent)">363<span style="font-size:12px;color:var(--text3)"> 分</span></div><div class="dt up">▲ 67</div></div>
+    <div class="kpi"><div class="glow" style="background:var(--gold)"></div><div class="lb">城区最高线</div><div class="vl" style="color:var(--gold)">504<span style="font-size:12px;color:var(--text3)"> 分</span></div><div class="dt up">一中 +2</div></div>
+    <div class="kpi"><div class="glow" style="background:var(--up)"></div><div class="lb">最大涨幅</div><div class="vl" style="color:var(--up)">+82<span style="font-size:12px;color:var(--text3)"> 分</span></div><div class="dt up">天立</div></div>
+    <div class="kpi"><div class="glow" style="background:var(--down)"></div><div class="lb">最大跌幅</div><div class="vl" style="color:var(--down)">−24<span style="font-size:12px;color:var(--text3)"> 分</span></div><div class="dt down">孔子</div></div>
+  </div>
+  <div class="row mb">
+    <div class="card w3">
+      <div class="card-h"><span class="ic">📋</span><h3>四年统招分数线</h3><span class="tag">点击排序</span></div>
+      <div class="card-b" style="padding:0;overflow-x:auto"><table id="mainT"><thead><tr>
+        <th data-c="n" style="min-width:140px">学校</th>
+        <th data-c="0">2023</th><th data-c="1">2024</th><th data-c="2">2025</th><th data-c="3">2026</th>
+        <th data-c="d">25→26</th><th style="cursor:default">走势</th>
+      </tr></thead><tbody id="tB"></tbody></table></div>
+    </div>
+    <div>
+      <div class="card mb"><div class="card-h"><span class="ic">📈</span><h3>资格线走势</h3></div><div class="card-b"><div class="ch-sm" id="cQual"></div></div></div>
+      <div class="card"><div class="card-h"><span class="ic">🏫</span><h3>层级分布</h3></div><div class="card-b"><div class="ch-sm" id="cTier"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 学校地图 ═══════ -->
+<div class="panel" id="p-map">
+  <div class="card">
+    <div class="card-h"><span class="ic">🗺️</span><h3>济宁城区高中分布地图</h3><span class="tag">点击标记查看详情</span></div>
+    <div class="card-b" style="padding:0;position:relative" id="mapWrap">
+      <div id="realMap"></div>
+      <div class="map-overlay">
+        <div class="ov-title">图例</div>
+        <div class="ov-item"><span class="ov-dot" style="background:var(--gold)"></span>一类重点</div>
+        <div class="ov-item"><span class="ov-dot" style="background:var(--accent)"></span>二类</div>
+        <div class="ov-item"><span class="ov-dot" style="background:#9296a6"></span>三类</div>
+        <div style="margin-top:4px;color:var(--text3);font-size:10px">圆圈大小 = 分数线高低</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 排名动态 ═══════ -->
+<div class="panel" id="p-race">
+  <div class="card">
+    <div class="card-h"><span class="ic">🏆</span><h3>排名动态 · 2023→2026</h3><span class="tag">自动播放</span></div>
+    <div class="card-b">
+      <div class="race-area" id="raceArea"></div>
+      <div class="race-ctrl">
+        <button class="race-btn" id="raceBtn" onclick="toggleRace()">▶ 播放</button>
+        <span class="race-yr" id="raceYr">2023</span>
+        <div class="race-track" onclick="seekRace(event)"><div class="race-fill" id="raceFill"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 趋势分析 ═══════ -->
+<div class="panel" id="p-trend">
+  <div class="row mb">
+    <div class="card w2"><div class="card-h"><span class="ic">📈</span><h3>头部学校走势</h3><span class="tag">图例可点</span></div><div class="card-b"><div class="ch-lg" id="cTrend"></div></div></div>
+    <div class="card"><div class="card-h"><span class="ic">📊</span><h3>各校分数段</h3></div><div class="card-b"><div class="ch-lg" id="cDist"></div></div></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><span class="ic">📉</span><h3>2025→2026 涨跌瀑布</h3></div>
+    <div class="card-b"><div class="ch" id="cWater"></div></div>
+  </div>
+</div>
+
+<!-- ═══════ 雷达对比 ═══════ -->
+<div class="panel" id="p-radar">
+  <div class="row">
+    <div class="card w2">
+      <div class="card-h"><span class="ic">🎯</span><h3>多维雷达对比</h3><span class="tag">选校对比</span></div>
+      <div class="card-b">
+        <div class="radar-picks" id="rPick"></div>
+        <div class="ch-lg" id="cRadar"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><span class="ic">📋</span><h3>维度说明</h3></div>
+      <div class="card-b" style="font-size:14px;color:var(--text2);line-height:2">
+        <p><strong style="color:var(--gold)">📊 2026分数线</strong> — 当年实际录取分</p>
+        <p><strong style="color:var(--accent)">📈 历史最高</strong> — 近年最高录取线</p>
+        <p><strong style="color:var(--down)">🎯 稳定性</strong> — 标准差，越低越稳（≥3年数据）</p>
+        <p><strong style="color:var(--up)">🔥 增长力</strong> — 25→26 涨幅</p>
+        <p><strong style="color:var(--accent2)">💎 竞争度</strong> — 与资格线差距</p>
+        <div style="margin-top:14px;padding:12px;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
+          <p style="font-weight:700;color:var(--text);margin-bottom:4px">💡 使用方法</p>
+          <p>点上方标签选 2-5 校对比，雷达图实时更新。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 数据解读 ═══════ -->
+<div class="panel" id="p-insight">
+  <div class="insight-box mb" id="aiBox"></div>
+  <div class="row">
+    <div class="card"><div class="card-h"><span class="ic">📊</span><h3>关键数据</h3></div><div class="card-b" id="aiSum" style="font-size:14px;color:var(--text2);line-height:2"></div></div>
+    <div class="card"><div class="card-h"><span class="ic">🔮</span><h3>2027 预测</h3></div><div class="card-b" id="aiPred" style="font-size:14px;color:var(--text2);line-height:2"></div></div>
+  </div>
+</div>
+
+<div style="text-align:center;padding:20px 0 0;font-size:11px;color:var(--text3);line-height:1.8">
+  数据来源：济宁市教育局 · 2023.07 / 2024.06 / 2025.06 / 2026.06<br>
+  数据整理：<a href="https://space.bilibili.com/1304049223" target="_blank" rel="noopener" onclick="window.open(this.href,'_blank');return false;" style="color:var(--accent);text-decoration:none;font-weight:600;cursor:pointer">义恒2</a>
+  &nbsp;·&nbsp; 生成于 2026-06-29
+</div>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+/* ═══ DATA ═══ */
+const D=[
+  {n:'济宁市第一中学',t:'a',s:[521,491,502,504],addr:'太白湖新区圣贤路11号',lat:35.3820,lng:116.5920},
+  {n:'济宁市育才中学',t:'a',s:[503,507,511,499],addr:'任城区洸河路26号',lat:35.4130,lng:116.5810},
+  {n:'济宁孔子高级中学',t:'a',s:[535,493,525,501],addr:'高新区海川路',lat:35.3980,lng:116.6480},
+  {n:'济宁市实验中学',t:'b',s:[503,479,491,486],addr:'任城区建设北路42号',lat:35.4320,lng:116.5720},
+  {n:'济宁一中任城校区',t:'b',s:[493,461,445,446],addr:'任城区枫杨路',lat:35.4200,lng:116.5620},
+  {n:'济宁学院附属高级中学',t:'b',s:[483,435,432,433],addr:'任城区枫杨路1号',lat:35.4180,lng:116.5980},
+  {n:'济宁海达行知学校',t:'b',s:[455,434,437,427],addr:'高新区海川路66号',lat:35.4050,lng:116.6400},
+  {n:'任城区英才高级中学',t:'c',s:[438,411,390,409],addr:'任城区',lat:35.4420,lng:116.5550},
+  {n:'济宁市第二中学',t:'c',s:[456,420,370,387],addr:'任城区',lat:35.4480,lng:116.5780},
+  {n:'济宁高新区第二高中',t:'c',s:[431,398,365,381],addr:'高新区',lat:35.3880,lng:116.6580},
+  {n:'济宁高新区高级中学',t:'c',s:[417,387,355,366],addr:'高新区',lat:35.3820,lng:116.6320},
+  {n:'济宁天立高级中学',t:'c',s:[405,340,296,378],addr:'高新区',lat:35.3750,lng:116.6500},
+  {n:'济宁王府高级中学',t:'c',s:[null,340,296,363],addr:'任城区',lat:35.4280,lng:116.6120},
+];
+const YRS=[2023,2024,2025,2026],QUAL=[405,340,296,363];
+const PAL=['#4361ee','#7c5cfc','#e8930c','#e04050','#10b981','#f97316','#0891b2','#d946ef','#65a30d','#64748b','#ef4444','#9333ea','#0284c7'];
+const tip=document.getElementById('tip');
+const showTip=(e,t)=>{tip.textContent=t;tip.classList.add('show');tip.style.left=e.clientX+12+'px';tip.style.top=e.clientY-32+'px'};
+const hideTip=()=>tip.classList.remove('show');
+const sn=n=>n.replace('济宁','').replace('市','').replace('学院附属高级中学','附高').replace('附属高级中学','附高').replace('高级中学','');
+
+setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('zh-CN',{hour12:false})},1000);
+
+/* ── Nav ── */
+let mapInited=false;
+document.querySelectorAll('.nav-btn').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('show'));
+    b.classList.add('on');
+    const pid=b.dataset.p;
+    document.getElementById('p-'+pid).classList.add('show');
+    setTimeout(()=>{charts.forEach(c=>c.resize());if(pid==='map'&&!mapInited){initMap();mapInited=true}else if(pid==='map'&&window._leafletMap){window._leafletMap.invalidateSize()}
+      if(pid==='race'&&!raceInited){raceInited=true;initRace();}
+    },80);
+  };
+});
+
+/* ═══ TABLE ═══ */
+let sc=null,sd=1;
+function renderT(data){
+  document.getElementById('tB').innerHTML=data.map(s=>{
+    const d=s.s[3]-s.s[2],bg=d>0?'badge up':d<0?'badge down':'badge flat',bv=d>0?`+${d}`:d<0?`${d}`:'—';
+    const tc=s.t==='a'?'tier tier-a':s.t==='b'?'tier tier-b':'tier tier-c';
+    const tl=s.t==='a'?'一':s.t==='b'?'二':'三';
+    const cells=s.s.map((v,i)=>{
+      if(!v)return'<td style="color:var(--text3)">—</td>';
+      return`<td${i===3&&v>=500?' style="color:var(--accent);font-weight:700"':''} data-tip="${YRS[i]}年 ${v}分">${v}</td>`;
+    }).join('');
+    const valid=s.s.filter(v=>v),mn=Math.min(...valid)-10,mx=Math.max(...valid)+10;
+    const bars=s.s.map((v,i)=>{
+      if(!v)return'<div style="width:3px"></div>';
+      return`<div class="spark-bar" style="height:${((v-mn)/(mx-mn))*16+2}px;background:${PAL[i]};opacity:${i===3?1:.3}"></div>`;
+    }).join('');
+    return`<tr><td><div class="sch-cell"><span class="${tc}">${tl}</span>${sn(s.n)}</div></td>${cells}<td><span class="${bg}">${bv}</span></td><td><div class="spark">${bars}</div></td></tr>`;
+  }).join('');
+  document.getElementById('tB').querySelectorAll('[data-tip]').forEach(el=>{
+    el.onmouseenter=e=>showTip(e,el.dataset.tip);
+    el.onmousemove=e=>{tip.style.left=e.clientX+12+'px';tip.style.top=e.clientY-32+'px'};
+    el.onmouseleave=hideTip;
+  });
+}
+document.querySelectorAll('#mainT th[data-c]').forEach(th=>{
+  th.onclick=()=>{const c=th.dataset.c;if(sc===c)sd*=-1;else{sc=c;sd=1}renderT([...D].sort((a,b)=>{if(c==='n')return sd*a.n.localeCompare(b.n,'zh');if(c==='d')return sd*((a.s[3]-a.s[2])-(b.s[3]-b.s[2]));return sd*((a.s[+c]??0)-(b.s[+c]??0))}))};
+});
+renderT(D);
+
+/* ═══ CHARTS ═══ */
+const charts=[];
+function initC(id,opt){const el=document.getElementById(id);if(!el)return null;const c=echarts.init(el);c.setOption(opt);charts.push(c);return c}
+window.addEventListener('resize',()=>charts.forEach(c=>c.resize()));
+const tBg='transparent',gr={top:40,right:16,bottom:28,left:46};
+const axL={lineStyle:{color:'rgba(0,0,0,.08)'}},spL={lineStyle:{color:'rgba(0,0,0,.05)'}},axT={color:'#9296a6',fontSize:12};
+const tt={backgroundColor:'#fff',borderColor:'#e2e4eb',textStyle:{color:'#1a1d2e',fontSize:11},extraCssText:'box-shadow:0 4px 16px rgba(0,0,0,.08)'};
+
+initC('cQual',{backgroundColor:tBg,grid:gr,xAxis:{type:'category',data:YRS,axisLine:axL,axisLabel:axT},yAxis:{type:'value',min:250,max:450,axisLine:{show:false},splitLine:spL,axisLabel:axT},series:[{type:'line',data:QUAL,smooth:true,lineStyle:{width:3,color:'#4e7cff'},areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(78,124,255,.25)'},{offset:1,color:'rgba(78,124,255,.01)'}]}},itemStyle:{color:'#4361ee'},symbol:'circle',symbolSize:7,label:{show:true,formatter:'{c}',color:'#1a1d2e',fontSize:11,fontWeight:700}}],tooltip:{trigger:'axis',...tt}});
+const tc={一类:0,二类:0,三类:0};D.forEach(s=>tc[s.t==='a'?'一类':s.t==='b'?'二类':'三类']++);
+initC('cTier',{backgroundColor:tBg,grid:{top:10,right:10,bottom:10,left:10},series:[{type:'pie',radius:['38%','68%'],center:['50%','55%'],data:[{value:tc['一类'],name:'一类 3所',itemStyle:{color:'#e8930c'}},{value:tc['二类'],name:'二类 4所',itemStyle:{color:'#4361ee'}},{value:tc['三类'],name:'三类 6所',itemStyle:{color:'#9296a6'}}],label:{color:'#5b5f72',fontSize:13,fontWeight:600,formatter:'{b}'},labelLine:{lineStyle:{color:'#ccc',width:1.5},length:12,length2:16},itemStyle:{borderColor:'#fff',borderWidth:2},emphasis:{label:{fontSize:14,fontWeight:700}}}],tooltip:{...tt}});
+
+/* ═══ REAL MAP (Leaflet) ═══ */
+function initMap(){
+  const map=L.map('realMap',{zoomControl:false,attributionControl:false}).setView([35.41,116.61],12);
+  window._leafletMap=map;
+
+  // dark tile
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+    maxZoom:18,subdomains:'abcd'
+  }).addTo(map);
+
+  // zoom control bottom-right
+  L.control.zoom({position:'bottomright'}).addTo(map);
+
+  // add markers
+  D.forEach(s=>{
+    const sz=Math.max(18,(s.s[3]||300)/14);
+    const cls=s.t==='a'?'tier-a':s.t==='b'?'tier-b':'tier-c';
+    const col=s.t==='a'?'#e8930c':s.t==='b'?'#4361ee':'#9296a6';
+    const score=s.s[3]||'—';
+    const diff=s.s[3]?(s.s[3]-s.s[2]):0;
+    const diffStr=diff>0?`<span style="color:#ff4d6a">+${diff}</span>`:diff<0?`<span style="color:#00d68f">${diff}</span>`:'—';
+    const yrLines=YRS.map((yr,i)=>`<span style="color:${i===3?col:'#9296a6'};font-weight:${i===3?800:400}">${yr}：${s.s[i]||'—'}</span>`).join(' &nbsp;·&nbsp; ');
+
+    const icon=L.divIcon({
+      className:'',
+      html:`<div class="school-marker ${cls}" style="width:${sz}px;height:${sz}px;line-height:${sz}px">${score}</div>`,
+      iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]
+    });
+
+    const marker=L.marker([s.lat,s.lng],{icon}).addTo(map);
+    marker.bindPopup(`
+      <div class="pop-name">${s.n}</div>
+      <div class="pop-addr">📍 ${s.addr}</div>
+      <div class="pop-score" style="color:${col}">${score} 分</div>
+      <div class="pop-detail">25→26 变动：${diffStr} 分</div>
+      <div class="pop-detail" style="margin-top:4px;color:#555">${yrLines}</div>
+    `,{maxWidth:280,offset:[0,-sz/2]});
+  });
+
+  // area labels
+  const areas=[
+    {name:'太白湖新区',lat:35.365,lng:116.585,col:'rgba(67,97,238,.7)'},
+    {name:'任城区',lat:35.455,lng:116.545,col:'rgba(255,167,38,.5)'},
+    {name:'高新区',lat:35.370,lng:116.665,col:'rgba(0,214,143,.5)'},
+  ];
+  areas.forEach(a=>{
+    L.marker([a.lat,a.lng],{
+      icon:L.divIcon({className:'',html:`<div style="font-size:13px;font-weight:700;color:${a.col};white-space:nowrap;letter-spacing:1px;text-shadow:0 0 6px rgba(255,255,255,.8)">${a.name}</div>`,iconSize:[0,0],iconAnchor:[-10,0]})
+    }).addTo(map);
+  });
+}
+
+/* ═══ RACE (smooth CSS transition) ═══ */
+let raceTmr=null,raceYr=0,raceOn=false;
+const raceArea=document.getElementById('raceArea');
+const RACE_H=40,RACE_PAD=10;
+const raceRows=[];
+
+// big year
+const raceBigEl=document.createElement('div');
+raceBigEl.className='race-big';
+raceArea.appendChild(raceBigEl);
+
+// build rows — NO transition class yet
+D.forEach((s,i)=>{
+  const col=s.t==='a'?'#e8930c':s.t==='b'?'#4361ee':'#9296a6';
+  const row=document.createElement('div');
+  row.className='race-row'; // no .go yet
+  const nameEl=document.createElement('div');
+  nameEl.className='race-name-lbl';
+  nameEl.textContent=sn(s.n);
+  const bar=document.createElement('div');
+  bar.className='race-bar-inner'; // no .go yet
+  bar.style.background=col;
+  const scoreEl=document.createElement('div');
+  scoreEl.className='race-val';
+  scoreEl.textContent='0';
+  row.appendChild(nameEl);row.appendChild(bar);row.appendChild(scoreEl);
+  raceArea.appendChild(row);
+  raceRows.push({el:row,bar,scoreEl,curVal:0});
+});
+
+// number counter
+function countTo(el,from,to,dur){
+  if(from===to){el.textContent=to;return}
+  const t0=performance.now();
+  (function tick(t){
+    const p=Math.min((t-t0)/dur,1);
+    el.textContent=Math.round(from+(to-from)*(1-Math.pow(1-p,3)));
+    if(p<1)requestAnimationFrame(tick);
+  })(t0);
+}
+
+function drawRace(yi,animate){
+  const scored=raceRows.map((r,i)=>({r,score:D[i].s[yi]||0,idx:i}))
+    .filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
+  scored.forEach((item,rank)=>{
+    const{r,score}=item;
+    const t=rank*RACE_H+RACE_PAD;
+    const w=(score/560*100)+'%';
+    if(animate)countTo(r.scoreEl,r.curVal,score,800);
+    else r.scoreEl.textContent=score;
+    r.el.style.top=t+'px';
+    r.el.style.opacity='1';
+    r.bar.style.width=w;
+    r.curVal=score;
+  });
+  raceRows.forEach((r,i)=>{
+    if(!(D[i].s[yi]>0)){
+      r.el.style.top='-50px';r.el.style.opacity='0';r.bar.style.width='0';r.curVal=0;
+    }
+  });
+  raceArea.style.height=(scored.length*RACE_H+RACE_PAD*2)+'px';
+  raceBigEl.textContent=YRS[yi];
+  document.getElementById('raceYr').textContent=YRS[yi];
+  document.getElementById('raceFill').style.width=(yi/3*100)+'%';
+}
+
+function initRace(){
+  // force layout so initial styles are computed
+  void raceArea.offsetHeight;
+  // now enable transitions
+  raceRows.forEach(r=>{r.el.classList.add('go');r.bar.classList.add('go');});
+  // animate first year
+  drawRace(0,true);
+}
+
+function toggleRace(){
+  if(raceOn){clearInterval(raceTmr);raceOn=false;document.getElementById('raceBtn').textContent='▶ 继续';document.getElementById('raceBtn').classList.remove('on');return}
+  if(raceYr>3)raceYr=0; // only reset when race finished, not on pause/resume
+  raceOn=true;document.getElementById('raceBtn').textContent='⏸ 暂停';document.getElementById('raceBtn').classList.add('on');
+  drawRace(raceYr,true);raceYr++;
+  raceTmr=setInterval(()=>{
+    drawRace(raceYr,true);raceYr++;
+    if(raceYr>3){clearInterval(raceTmr);raceOn=false;document.getElementById('raceBtn').textContent='▶ 重播';document.getElementById('raceBtn').classList.remove('on')}
+  },1800);
+}
+function seekRace(e){
+  const r=e.currentTarget.getBoundingClientRect();
+  raceYr=Math.round(Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*3);
+  drawRace(raceYr,false);
+}
+
+// drag support for progress bar
+const raceTrack=document.querySelector('.race-track');
+let raceDragging=false;
+function raceDragAt(e){
+  const r=raceTrack.getBoundingClientRect();
+  const x=(e.touches?e.touches[0].clientX:e.clientX);
+  const yr=Math.round(Math.max(0,Math.min(1,(x-r.left)/r.width))*3);
+  if(yr!==raceYr){raceYr=yr;drawRace(yr,false);}
+}
+raceTrack.addEventListener('mousedown',e=>{raceDragging=true;if(raceOn){clearInterval(raceTmr);raceOn=false;document.getElementById('raceBtn').textContent='▶ 继续';document.getElementById('raceBtn').classList.remove('on');}raceDragAt(e);});
+document.addEventListener('mousemove',e=>{if(raceDragging)raceDragAt(e);});
+document.addEventListener('mouseup',()=>{raceDragging=false;});
+raceTrack.addEventListener('touchstart',e=>{raceDragging=true;if(raceOn){clearInterval(raceTmr);raceOn=false;document.getElementById('raceBtn').textContent='▶ 继续';document.getElementById('raceBtn').classList.remove('on');}raceDragAt(e);},{passive:true});
+document.addEventListener('touchmove',e=>{if(raceDragging)raceDragAt(e);},{passive:true});
+document.addEventListener('touchend',()=>{raceDragging=false;});
+let raceInited=false;
+
+/* ═══ TREND ═══ */
+const trendS=D.filter(s=>s.t==='a'||s.t==='b').map((s,i)=>({name:sn(s.n),type:'line',data:s.s,smooth:true,lineStyle:{width:2.5},itemStyle:{color:PAL[i]},symbol:'circle',symbolSize:5,emphasis:{lineStyle:{width:4}}}));
+initC('cTrend',{backgroundColor:tBg,grid:{...gr,top:50},legend:{data:trendS.map(s=>s.name),top:5,textStyle:{color:'#9296a6',fontSize:12},itemWidth:12,itemHeight:6},xAxis:{type:'category',data:YRS,axisLine:axL,axisLabel:axT},yAxis:{type:'value',min:400,max:550,axisLine:{show:false},splitLine:spL,axisLabel:axT},series:trendS,tooltip:{trigger:'axis',...tt}});
+initC('cDist',{backgroundColor:tBg,grid:{...gr,bottom:50},xAxis:{type:'category',data:D.map(s=>sn(s.n)),axisLabel:{...axT,rotate:45},axisLine:axL},yAxis:{type:'value',min:280,max:550,axisLine:{show:false},splitLine:spL,axisLabel:axT},series:YRS.map((yr,i)=>({name:yr,type:'bar',data:D.map(s=>s.s[i]??null),itemStyle:{color:PAL[i],borderRadius:[2,2,0,0]},barGap:'8%'})),legend:{top:5,textStyle:{color:'#9296a6',fontSize:12},itemWidth:12,itemHeight:6},tooltip:{trigger:'axis',...tt}});
+const wf=D.map(s=>({name:sn(s.n),d:s.s[3]-s.s[2]})).sort((a,b)=>b.d-a.d);
+initC('cWater',{backgroundColor:tBg,grid:{...gr,bottom:55},xAxis:{type:'category',data:wf.map(d=>d.name),axisLabel:{...axT,rotate:45},axisLine:axL},yAxis:{type:'value',axisLine:{show:false},splitLine:spL,axisLabel:axT},series:[{type:'bar',data:wf.map(d=>({value:d.d,itemStyle:{color:d.d>0?'#e04050':d.d<0?'#10b981':'#9296a6',borderRadius:d.d>0?[3,3,0,0]:[0,0,3,3]}})),label:{show:true,position:'outside',formatter:p=>(p.value>0?'+':'')+p.value,color:'#9296a6',fontSize:9,fontWeight:600}}],tooltip:{trigger:'axis',...tt,formatter:p=>{const d=p[0];return`${d.name}<br/>变动：<b style="color:${d.value>0?'#e04050':'#10b981'}">${d.value>0?'+':''}${d.value} 分</b>`}}});
+
+/* ═══ RADAR ═══ */
+const rPick=document.getElementById('rPick');
+let rSel=new Set([0,1,2,3]);
+D.forEach((s,i)=>{const b=document.createElement('button');b.className='radar-pick'+(rSel.has(i)?' on':'');b.textContent=sn(s.n);b.style.borderColor=rSel.has(i)?PAL[i]:'';b.style.color=rSel.has(i)?PAL[i]:'';b.onclick=()=>{if(rSel.has(i)){if(rSel.size>1)rSel.delete(i)}else rSel.add(i);updPick();drawRadar()};rPick.appendChild(b)});
+function updPick(){rPick.querySelectorAll('.radar-pick').forEach((b,i)=>{b.classList.toggle('on',rSel.has(i));b.style.borderColor=rSel.has(i)?PAL[i]:'';b.style.color=rSel.has(i)?PAL[i]:''})}
+function drawRadar(){
+  const dims=['2026分数线','历史最高','稳定性','增长力','竞争度'];
+  const data=[...rSel].map(i=>{
+    const s=D[i],v=s.s.filter(x=>x);
+    const avg=v.reduce((a,b)=>a+b,0)/v.length;
+    const std=v.length>=3?Math.sqrt(v.map(x=>(x-avg)**2).reduce((a,b)=>a+b,0)/v.length):0;
+    const diff=s.s[3]-s.s[2];
+    const gap=s.s[3]-QUAL[3];
+    const peak=Math.max(...v);
+    return{name:sn(s.n),value:[
+      Math.min(100,(s.s[3]-300)/2.5),               // 2026分数线
+      Math.min(100,(peak-300)/2.5),                   // 历史最高
+      v.length>=3?Math.max(0,100-std*3):50,           // 稳定性（≥3年）
+      Math.min(100,Math.max(0,(diff+80)/2)),           // 增长力
+      Math.min(100,gap/1.6),                           // 竞争度
+    ],lineStyle:{color:PAL[i]},itemStyle:{color:PAL[i]},areaStyle:{color:PAL[i]+'18'}};
+  });
+  const rc=charts.find(c=>c.getDom()===document.getElementById('cRadar'));
+  const opt={backgroundColor:tBg,radar:{indicator:dims.map(d=>({name:d,max:100})),shape:'polygon',axisName:{color:'#9296a6',fontSize:10},splitArea:{areaStyle:{color:['rgba(0,0,0,.01)','rgba(0,0,0,.02)']}},splitLine:{lineStyle:{color:'rgba(0,0,0,.06)'}},axisLine:{lineStyle:{color:'rgba(0,0,0,.08)'}}},series:[{type:'radar',data,symbol:'circle',symbolSize:4}],legend:{data:data.map(s=>s.name),bottom:5,textStyle:{color:'#9296a6',fontSize:12},itemWidth:12,itemHeight:6},tooltip:{...tt}};
+  if(rc)rc.setOption(opt,true);else initC('cRadar',opt);
+}
+drawRadar();
+
+/* ═══ INSIGHT ═══ */
+document.getElementById('aiBox').innerHTML=`
+<div class="itag">📊 数据洞察</div>
+<p><strong>整体趋势：</strong>2026年资格线从296分大幅反弹至363分（<em>+67</em>），结束三年连降。中低段学校涨幅显著，生源质量整体回暖。</p>
+<p><strong>头部格局：</strong>一中（504）、孔子（501）、育才（499）三强鼎立，分差仅5分。育才<em>−12</em>、孔子<em>−24</em>，一中重回城区最高线。</p>
+<p><strong>最大黑马：</strong>天立<em>+82分</em>（296→378），王府<em>+67分</em>（296→363）。民办校在2025年"冰点"后强势反弹。</p>
+<p><strong>分化加剧：</strong>一中任城校区累计<em>−47分</em>，附高累计<em>−50分</em>。中间层梯队差距从20分扩大到53分。</p>
+<p><strong>格局变化：</strong>7校上涨、5校下跌、1校持平。分数分布更加扁平，校际差距在缩小。</p>`;
+document.getElementById('aiSum').innerHTML=`<p>📌 资格线：2023(405) → 2024(340) → 2025(296) → 2026(363)，四年波动109分</p><p>📌 最高线：2026年一中504，头部较历史高位下降</p><p>📌 最稳定：实验（标准差9.8）、一中（11.3）</p><p>📌 波动最大：天立（标准差40.5）</p><p>📌 涨幅TOP3：天立+82、王府+67、英才+19</p><p>📌 跌幅TOP3：孔子−24、育才−12、海达−10</p>`;
+document.getElementById('aiPred').innerHTML=`<p>🔮 资格线：2027年预计<em>340-380分</em>，大概率维持350+</p><p>🔮 头部：一中有望继续最高线，育才和孔子可能小幅回升</p><p>🔮 民办：天立、王府涨幅预计收窄至20-30分</p><p>🔮 中间层：实验稳居准一类（490+），任城、附属短期难回450+</p><div style="margin-top:10px;padding:10px;background:rgba(67,97,238,.06);border-radius:6px;border:1px solid rgba(67,97,238,.1);font-size:11px;color:var(--text3)">⚠️ 基于历史趋势分析，实际受试题难度、考生人数、招生计划等影响，仅供参考。</div>`;
+
+/* ═══ EXPORT ═══ */
+function expPNG(){html2canvas(document.getElementById('dash'),{backgroundColor:'#f4f5f9',scale:2,useCORS:true}).then(c=>{const a=document.createElement('a');a.download='济宁城区高中分数线_2026.png';a.href=c.toDataURL();a.click()})}
+function expPDF(){html2canvas(document.getElementById('dash'),{backgroundColor:'#f4f5f9',scale:2,useCORS:true}).then(c=>{const{jsPDF}=window.jspdf;const p=new jsPDF('l','mm','a4');const w=p.internal.pageSize.getWidth();const h=(c.height/c.width)*w;p.addImage(c.toDataURL('image/png'),'PNG',0,0,w,h);p.save('济宁城区高中分数线_2026.pdf')})}
+</script>
+</body>
+</html>
